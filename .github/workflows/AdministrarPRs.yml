@@ -1,0 +1,22 @@
+name: Validar PR a main
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  check-hotfix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Validar commits de PR
+        run: |
+          echo "Verificando commits de la PR..."
+          commits=$(git log origin/main..HEAD --pretty=%B)
+          echo "$commits"
+          if ! echo "$commits" | grep -iq "hotfix"; then
+            echo "❌ Merge no permitido: ninguno de los commits contiene 'hotfix'."
+            exit 1
+          fi
