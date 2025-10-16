@@ -1,44 +1,27 @@
-name: Validar PR a main
+name: Validate Pull Request
 
 on:
   pull_request:
-    branches:
-      - main
-      - master
+    types: [opened, edited, reopened]
 
 jobs:
-  check-hotfix:
+  validate-pr:
     runs-on: ubuntu-latest
     steps:
-      # 1️⃣ Checkout de la PR y todo el historial
-      - uses: actions/checkout@v3
+      - name: Check PR source and target
+        uses: actions/github-script@v6
         with:
-          fetch-depth: 0  # necesario para ver todos los commits
+          script: |
+            const pr = context.payload.pull_request;
+            const sourceBranch = pr.head.ref;
+            const targetBranch = pr.base.ref;
+            const title = pr.title.toLowerCase();
 
-      # 2️⃣ Validación de commits
-      - name: Validar commits de PR
-        run: |
-          echo "Verificando commits de la PR..."
-          
-          # Hacemos fetch de main para tener la referencia
-          git fetch origin main
+            // Condición 1: No permitir PRs a main/master si no vienen de dev
+            if ((targetBranch === 'main' || targetBranch === 'master') && sourceBranch !== 'dev') {
+              if (!title.includes('hotfix')) {
+                core.setFailed(`Solo se permiten PRs a ${targetBranch} desde la rama 'dev', excepto si el título contiene 'hotfix'.`);
+              }
+            }
 
-          # Recorremos todos los commits de la PR
-          hotfix_found=0
-          for sha in $(git rev-list origin/main..HEAD); do
-            msg=$(git log -1 --pretty=%B $sha)
-            echo "Commit: $msg"
-            if echo "$msg" | grep -iq "hotfix"; then
-              echo "✅ Hotfix encontrado en commit $sha"
-              hotfix_found=1
-              break
-            fi
-          done
-
-          # Si no encontramos hotfix, fallamos
-          if [ $hotfix_found -eq 0 ]; then
-            echo "❌ Merge no permitido: ningún commit contiene 'hotfix'."
-            exit 1
-          fi
-
-          echo "✅ PR válida: al menos un commit contiene 'hotfix'."
+    
