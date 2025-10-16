@@ -10,13 +10,35 @@ jobs:
   check-hotfix:
     runs-on: ubuntu-latest
     steps:
+      # 1️⃣ Checkout de la PR y todo el historial
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # necesario para ver todos los commits
+
+      # 2️⃣ Validación de commits
       - name: Validar commits de PR
         run: |
           echo "Verificando commits de la PR..."
-          commits=$(git log origin/main..HEAD --pretty=%B)
-          echo "$commits"
-          if ! echo "$commits" | grep -iq "hotfix"; then
-            echo "❌ Merge no permitido: ninguno de los commits contiene 'hotfix'."
+          
+          # Hacemos fetch de main para tener la referencia
+          git fetch origin main
+
+          # Recorremos todos los commits de la PR
+          hotfix_found=0
+          for sha in $(git rev-list origin/main..HEAD); do
+            msg=$(git log -1 --pretty=%B $sha)
+            echo "Commit: $msg"
+            if echo "$msg" | grep -iq "hotfix"; then
+              echo "✅ Hotfix encontrado en commit $sha"
+              hotfix_found=1
+              break
+            fi
+          done
+
+          # Si no encontramos hotfix, fallamos
+          if [ $hotfix_found -eq 0 ]; then
+            echo "❌ Merge no permitido: ningún commit contiene 'hotfix'."
             exit 1
           fi
+
+          echo "✅ PR válida: al menos un commit contiene 'hotfix'."
